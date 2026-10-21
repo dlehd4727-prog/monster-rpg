@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>몬스터 사냥 RPG - 플레이 데모</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101a23;color:#eef5fa;font-family:system-ui,sans-serif;display:flex;justify-content:center}
+main{width:min(100%,1000px);padding:16px}h1{font-size:1.4rem;margin:0 0 8px}p{color:#c4d2df;margin:5px 0 12px}
+#hud{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.pill{background:#203241;border:1px solid #385367;border-radius:10px;padding:8px 12px}
+canvas{width:100%;height:auto;display:block;border:2px solid #466173;border-radius:12px;background:#243d35;image-rendering:auto}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.controls button{background:#28495b;color:white;border:1px solid #5e8296;border-radius:10px;padding:10px 14px;font-size:1rem}
+small{color:#b9c8d4}
+</style>
+</head><body><main>
+<h1>⚔️ 몬스터 사냥 RPG — 플레이 데모</h1>
+<p>브라우저에서 바로 실행되는 간단한 시제품이야. Unity 프로젝트가 아닌 전투 기능 시연용 데모야.</p>
+<div id="hud">
+<div class="pill" id="hp">❤️ 체력: 100 / 100</div><div class="pill" id="xp">⭐ 레벨 1 · 경험치 0</div><div class="pill" id="pot">🧪 회복 물약: 3</div><div class="pill" id="msg">몬스터를 처치해 보자!</div>
+</div>
+<canvas id="game" width="960" height="560" aria-label="몬스터 사냥 게임"></canvas>
+<div class="controls">
+<button id="attack">공격 (Space)</button><button id="skill">스킬 (E)</button><button id="heal">물약 (Q)</button><button id="restart">다시 시작</button>
+</div>
+<p><small>조작: WASD 또는 방향키 이동 · Space 기본 공격 · E 범위 스킬 · Q 물약 사용. 몬스터가 가까이 오면 반격해.</small></p>
+</main>
+<script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height;
+let keys={},player,monsters,particles,level,xp,potions,lastAttack,lastSkill,msg,gameOver;
+function reset(){player={x:W/2,y:H/2,r:16,hp:100,maxHp:100,speed:3.2,faceX:1,faceY:0};level=1;xp=0;potions=3;lastAttack=0;lastSkill=0;msg='몬스터를 처치해 보자!';gameOver=false;particles=[];monsters=[];for(let i=0;i<7;i++)spawnMonster();updateHud()}
+function spawnMonster(){let x,y;do{x=40+Math.random()*(W-80);y=50+Math.random()*(H-100)}while(Math.hypot(x-player.x,y-player.y)<130);monsters.push({x,y,r:14,hp:35+level*7,maxHp:35+level*7,speed:.45+Math.random()*.25,hit:0})}
+function updateHud(){document.getElementById('hp').textContent=`❤️ 체력: ${Math.max(0,Math.ceil(player.hp))} / ${player.maxHp}`;document.getElementById('xp').textContent=`⭐ 레벨 ${level} · 경험치 ${xp}`;document.getElementById('pot').textContent=`🧪 회복 물약: ${potions}`;document.getElementById('msg').textContent=msg}
+function hitMonster(m,dmg){m.hp-=dmg;m.hit=8;particles.push({x:m.x,y:m.y-20,t:30,text:`-${dmg}`});if(m.hp<=0){monsters=monsters.filter(a=>a!==m);xp+=20;msg='몬스터 처치! 경험치 +20';if(xp>=level*60){xp-=level*60;level++;player.maxHp+=15;player.hp=player.maxHp;msg=`레벨 업! 레벨 ${level}`;}spawnMonster();}}
+function attack(){if(gameOver)return;let now=Date.now();if(now-lastAttack<350)return;lastAttack=now;let nearest=null,dist=65;for(let m of monsters){let d=Math.hypot(m.x-player.x,m.y-player.y);if(d<dist){dist=d;nearest=m}}if(nearest){hitMonster(nearest,18+level*4);particles.push({x:player.x+player.faceX*25,y:player.y+player.faceY*25,t:8,slash:true})}else msg='가까운 몬스터가 없어!';updateHud()}
+function skill(){if(gameOver)return;let now=Date.now();if(now-lastSkill<2200){msg='스킬 재사용 대기 중!';updateHud();return}lastSkill=now;let hit=0;for(let m of [...monsters])if(Math.hypot(m.x-player.x,m.y-player.y)<115){hitMonster(m,28+level*6);hit++}msg=hit?`범위 스킬 적중! (${hit}마리)`:'주변에 맞은 몬스터가 없어';particles.push({x:player.x,y:player.y,t:18,ring:true});updateHud()}
+function heal(){if(potions<=0||player.hp>=player.maxHp||gameOver){msg='물약을 사용할 수 없어!';updateHud();return}potions--;player.hp=Math.min(player.maxHp,player.hp+35);msg='체력을 35 회복했어!';updateHud()}
+function drawGround(){ctx.fillStyle='#244638';ctx.fillRect(0,0,W,H);for(let y=20;y<H;y+=40){for(let x=(y%80?0:20);x<W;x+=40){ctx.fillStyle=((x+y)%3===0)?'#2b5140':'#284b3c';ctx.fillRect(x,y,18,18)}}ctx.strokeStyle='#53725b';ctx.lineWidth=3;ctx.strokeRect(12,12,W-24,H-24);for(let i=0;i<9;i++){let x=(i*113+45)%W,y=(i*71+20)%H;ctx.fillStyle='#18362d';ctx.beginPath();ctx.arc(x,y,14,0,Math.PI*2);ctx.fill();ctx.fillStyle='#35684b';ctx.beginPath();ctx.arc(x-3,y-4,11,0,Math.PI*2);ctx.fill()}}
+function bar(x,y,w,h,v,max){ctx.fillStyle='#17222b';ctx.fillRect(x-w/2,y,w,h);ctx.fillStyle=v/max>.5?'#56d17b':v/max>.25?'#f1c75b':'#ee6464';ctx.fillRect(x-w/2,y,w*Math.max(0,v/max),h)}
+function draw(){drawGround();
+for(let m of monsters){ctx.fillStyle='#0005';ctx.beginPath();ctx.ellipse(m.x,m.y+10,17,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=m.hit?'#ffb5a1':'#b65c68';ctx.beginPath();ctx.arc(m.x,m.y, m.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f5d7dc';ctx.beginPath();ctx.arc(m.x-5,m.y-3,3,0,Math.PI*2);ctx.arc(m.x+5,m.y-3,3,0,Math.PI*2);ctx.fill();bar(m.x,m.y-24,36,5,m.hp,m.maxHp)}
+ctx.fillStyle='#0005';ctx.beginPath();ctx.ellipse(player.x,player.y+12,18,7,0,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#4db8f2';ctx.beginPath();ctx.arc(player.x,player.y,player.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d9f2ff';ctx.beginPath();ctx.arc(player.x+player.faceX*6-3,player.y+player.faceY*6-3,4,0,Math.PI*2);ctx.fill();bar(player.x,player.y-27,44,6,player.hp,player.maxHp);
+for(let p of particles){ctx.globalAlpha=Math.max(0,p.t/30);if(p.ring){ctx.strokeStyle='#9ce7ff';ctx.lineWidth=5;ctx.beginPath();ctx.arc(p.x,p.y,120*(1-p.t/18),0,Math.PI*2);ctx.stroke()}else if(p.slash){ctx.strokeStyle='#eafaff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(p.x-12,p.y-12);ctx.lineTo(p.x+12,p.y+12);ctx.stroke()}else{ctx.fillStyle='#fff';ctx.font='bold 16px sans-serif';ctx.fillText(p.text,p.x,p.y-p.t*.5)}ctx.globalAlpha=1;p.t--}
+particles=particles.filter(p=>p.t>0);
+if(gameOver){ctx.fillStyle='#07121bd9';ctx.fillRect(0,0,W,H);ctx.fillStyle='white';ctx.textAlign='center';ctx.font='bold 42px sans-serif';ctx.fillText('게임 종료',W/2,H/2);ctx.font='20px sans-serif';ctx.fillText('다시 시작 버튼을 눌러 재도전!',W/2,H/2+42);ctx.textAlign='left'}
+}
+function update(){if(!gameOver){let dx=0,dy=0;if(keys.w||keys.ArrowUp)dy--;if(keys.s||keys.ArrowDown)dy++;if(keys.a||keys.ArrowLeft)dx--;if(keys.d||keys.ArrowRight)dx++;if(dx||dy){let n=Math.hypot(dx,dy);dx/=n;dy/=n;player.x+=dx*player.speed;player.y+=dy*player.speed;player.faceX=dx;player.faceY=dy}player.x=Math.max(28,Math.min(W-28,player.x));player.y=Math.max(35,Math.min(H-28,player.y));
+for(let m of monsters){let dx=player.x-m.x,dy=player.y-m.y,d=Math.hypot(dx,dy)||1;if(d>29){m.x+=dx/d*m.speed;m.y+=dy/d*m.speed}else if(Date.now()%28<2){player.hp-=4;msg='몬스터에게 공격받고 있어!';if(player.hp<=0){player.hp=0;gameOver=true;msg='게임 종료'}updateHud()}}}
+draw();requestAnimationFrame(update)}
+window.addEventListener('keydown',e=>{let k=e.key.length===1?e.key.toLowerCase():e.key;keys[k]=true;if(e.code==='Space'){e.preventDefault();attack()}if(k==='e')skill();if(k==='q')heal()});window.addEventListener('keyup',e=>{let k=e.key.length===1?e.key.toLowerCase():e.key;keys[k]=false});
+document.getElementById('attack').onclick=attack;document.getElementById('skill').onclick=skill;document.getElementById('heal').onclick=heal;document.getElementById('restart').onclick=()=>{reset()};reset();update();
+</script></body></html>
